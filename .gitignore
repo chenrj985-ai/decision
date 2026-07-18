@@ -1,7 +1,5 @@
 .venv/
 __pycache__/
 *.pyc
-logs/
-output/
-site/
 .DS_Store
+.env

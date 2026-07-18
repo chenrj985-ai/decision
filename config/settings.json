@@ -1,0 +1,27 @@
+{
+  "system_name": "Stock Decision System V6",
+  "timezone": "Asia/Shanghai",
+  "history_days": 90,
+  "top_recommendations": 12,
+  "news_cache_hours": 6,
+  "network_timeout_seconds": 15,
+  "publish_pages": true,
+  "market_symbols": {
+    "SP500": "^GSPC",
+    "NASDAQ": "^IXIC",
+    "SOX": "^SOX",
+    "VIX": "^VIX",
+    "HSTECH": "^HSTECH",
+    "USD_CNY": "CNY=X"
+  },
+  "etfs": {
+    "半导体": "512480.SS",
+    "芯片": "159995.SZ",
+    "通信": "515880.SS",
+    "人工智能": "159819.SZ",
+    "科创50": "588000.SS",
+    "创业板": "159915.SZ",
+    "军工": "512660.SS",
+    "新能源": "516160.SS"
+  }
+}

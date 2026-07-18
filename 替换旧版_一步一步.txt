@@ -1,0 +1,10 @@
+1. 解压本压缩包。
+2. 打开解压后的“StockDecisionSystem_V6_正式版”文件夹。
+3. Ctrl+A 全选里面的内容，不要只复制最外层文件夹。
+4. GitHub Desktop：Repository → Show in Explorer。
+5. 粘贴并选择“替换目标中的文件”。
+6. 回到 GitHub Desktop，Summary 填：Replace with V6 formal。
+7. 点击 Commit to main。
+8. 点击 Push origin。
+9. GitHub 网页进入 Actions，运行 Stock Decision V6 Formal。
+10. 成功后，GitHub 会出现 site、output、logs、reports、cache 等目录及生成文件。
