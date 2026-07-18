@@ -1,0 +1,8 @@
+﻿date,item,direction,impact,sector,note,source,url
+2026-07-18,VIX恐慌指数,risk,5.0,全市场,最新18.77，1日+12.19%，5日+24.88%,Yahoo Finance chart,
+2026-07-18,费城半导体指数,risk,10.1,半导体/CPO/PCB/存储,最新11673.89，1日-1.63%，5日-9.97%,Yahoo Finance chart,
+2026-07-18,纳斯达克指数,risk,4.1,科技成长,最新25520.24，1日-1.40%，5日-2.90%,Yahoo Finance chart,
+2026-07-18,国际原油,risk,12.0,航空/化工下游,最新82.49，1日+4.48%，5日+15.52%,Yahoo Finance chart,
+2026-07-18,英伟达,risk,6.0,CPO/PCB/AI服务器,最新202.81，1日-2.21%，5日-3.86%,Yahoo Finance chart,
+2026-07-18,美光科技,risk,11.3,存储芯片,最新848.95，1日-0.50%，5日-13.31%,Yahoo Finance chart,
+2026-07-18,台积电ADR,risk,10.2,半导体设备/晶圆制造,最新398.37，1日-2.77%，5日-8.23%,Yahoo Finance chart,

@@ -1,78 +1,78 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import csv
 import json
 import shutil
+import subprocess
+import sys
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from app.market import fetch_many, fetch_quote
-from app.news import fetch_news
-from app.report import build_site
-from app.scoring import global_risk, stock_score
-from app.utils import ROOT, atomic_write, ensure_dirs, load_json, now_cn, save_json
+BASE = Path(__file__).resolve().parent
+SITE = BASE / "site"
+OUT = BASE / "output"
+LOGS = BASE / "logs"
 
+def bj_now():
+    return datetime.now(timezone(timedelta(hours=8)))
 
-def read_csv(path: Path):
-    with path.open("r", encoding="utf-8-sig", newline="") as f:
-        return list(csv.DictReader(f))
+def run_script(name: str, required: bool) -> int:
+    path = BASE / name
+    if not path.exists():
+        if required:
+            raise FileNotFoundError(path)
+        return 0
+    print(f"[cloud] running {name}", flush=True)
+    p = subprocess.run([sys.executable, str(path)], cwd=BASE)
+    if required and p.returncode != 0:
+        raise RuntimeError(f"{name} failed with code {p.returncode}")
+    return p.returncode
 
+def publish_site():
+    SITE.mkdir(parents=True, exist_ok=True)
+    src = OUT / "mobile_latest.html"
+    if not src.exists() or src.stat().st_size < 500:
+        raise RuntimeError("output/mobile_latest.html was not generated")
+    shutil.copy2(src, SITE / "index.html")
 
-def suffix(code: str) -> str:
-    code = str(code).zfill(6)
-    return f"{code}.SS" if code.startswith(("6", "9")) else f"{code}.SZ"
-
-
-def main() -> int:
-    ensure_dirs()
-    cfg = load_json(ROOT / "config/settings.json", {}) or {}
-    market = fetch_many(cfg.get("market_symbols", {}))
-    etfs = fetch_many(cfg.get("etfs", {}))
-    news = fetch_news(cfg.get("network_timeout_seconds", 15), cfg.get("news_cache_hours", 6))
-    risk = global_risk(market, news)
-
-    etf_strength = {}
-    for name, q in etfs.items():
-        etf_strength[name] = (q.get("change_pct") or 0) * 4 + (q.get("ma20_gap_pct") or 0) * 1.2
-
-    stocks = []
-    for row in read_csv(ROOT / "data/stock_pool_seed.csv"):
-        q = fetch_quote(suffix(row["code"])).to_dict()
-        industry = row.get("industry", "")
-        strength = max(etf_strength.values() or [0])
-        for etf_name, value in etf_strength.items():
-            if etf_name in industry or industry in etf_name:
-                strength = value
-                break
-        decision = stock_score(q, strength, risk["score"])
-        stocks.append({**row, "quote": q, "decision": decision})
-    stocks.sort(key=lambda x: x["decision"]["score"], reverse=True)
-    stocks = stocks[: int(cfg.get("top_recommendations", 12))]
-
-    snapshot = {
-        "version": "6.0.1-formal",
-        "generated_at": now_cn().strftime("%Y-%m-%d %H:%M:%S"),
-        "market": market,
-        "etfs": etfs,
-        "news": news,
-        "risk": risk,
-        "stocks": stocks,
-        "health": {
-            "stocks_ok": sum(x["quote"]["status"] == "ok" for x in stocks),
-            "stocks_total": len(stocks),
-            "etfs_ok": sum(x.get("status") == "ok" for x in etfs.values()),
-            "etfs_total": len(etfs),
-        },
+    mapping = {
+        "market_snapshot.csv": "market_snapshot.csv",
+        "index_snapshot.csv": "index_snapshot.csv",
+        "etf_rotation.csv": "etf_rotation.csv",
+        "all_scores.csv": "all_scores.csv",
+        "buy_candidates.csv": "buy_candidates.csv",
+        "position_decisions.csv": "position_decisions.csv",
+        "latest_decision.txt": "latest_decision.txt",
     }
+    copied = []
+    for src_name, dst_name in mapping.items():
+        p = OUT / src_name
+        if p.exists():
+            shutil.copy2(p, SITE / dst_name)
+            copied.append(dst_name)
 
-    stamp = now_cn().strftime("%Y%m%d_%H%M%S")
-    save_json(ROOT / "output/latest.json", snapshot)
-    save_json(ROOT / f"output/history/{stamp}.json", snapshot)
-    build_site(snapshot)
-    atomic_write(ROOT / "logs/latest.log", f"{snapshot['generated_at']} run_ok risk={risk['score']} stocks={len(stocks)}\n")
-    atomic_write(ROOT / "reports/latest_summary.txt", f"风险={risk['score']} {risk['level']} {risk['regime']}\n推荐={','.join(x['name'] for x in stocks[:5])}\n")
-    print(json.dumps(snapshot["health"], ensure_ascii=False))
-    return 0
+    manifest = {
+        "version": "V5.1.1 GitHub core migration",
+        "beijing_time": bj_now().strftime("%Y-%m-%d %H:%M:%S"),
+        "index": "index.html",
+        "files": copied,
+        "note": "Original V5.1.1 market/scoring logic preserved; only GitHub orchestration added."
+    }
+    (SITE / "latest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2),
+        encoding="utf-8"
+    )
 
+def main():
+    # Auto-risk is useful but non-fatal: rate limits must not block the market report.
+    try:
+        run_script("update_risk_data.py", required=False)
+    except Exception as e:
+        print(f"[cloud] warning: auto risk update skipped: {e}", flush=True)
+
+    run_script("main.py", required=True)
+    publish_site()
+    print("[cloud] completed: site/index.html", flush=True)
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

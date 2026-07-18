@@ -1,0 +1,8 @@
+[2026-07-18 22:40:38] V5.1 AutoRisk开始运行
+[2026-07-18 22:40:38] 自动发现接口不可用，继续使用核心池与历史动态池: HTTPSConnectionPool(host='push2.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/clist/get?pn=1&pz=500&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f6&fs=m%3A0%2Bt%3A6%2Cm%3A0%2Bt%3A80%2Cm%3A1%2Bt%3A2%2Cm%3A1%2Bt%3A23&fields=f12%2Cf14%2Cf2%2Cf3%2Cf6%2Cf8%2Cf15%2Cf16%2Cf17%2Cf18 (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))
+[2026-07-18 22:40:38] 股票池：核心130，持仓6，自动发现0，合并后131
+[2026-07-18 22:40:40] 运行完成：E:\GITHUB\decision\output\mobile_latest.html
+[2026-07-18 22:48:32] V5.1 AutoRisk开始运行
+[2026-07-18 22:48:32] 自动发现接口不可用，继续使用核心池与历史动态池: HTTPSConnectionPool(host='push2.eastmoney.com', port=443): Max retries exceeded with url: /api/qt/clist/get?pn=1&pz=500&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f6&fs=m%3A0%2Bt%3A6%2Cm%3A0%2Bt%3A80%2Cm%3A1%2Bt%3A2%2Cm%3A1%2Bt%3A23&fields=f12%2Cf14%2Cf2%2Cf3%2Cf6%2Cf8%2Cf15%2Cf16%2Cf17%2Cf18 (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))
+[2026-07-18 22:48:32] 股票池：核心130，持仓6，自动发现0，合并后131
+[2026-07-18 22:48:33] 运行完成：E:\GITHUB\decision\output\mobile_latest.html

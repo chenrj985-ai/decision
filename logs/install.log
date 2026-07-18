@@ -1,0 +1,22 @@
+Requirement already satisfied: pip in e:\github\decision\.venv\lib\site-packages (24.2)
+Collecting pip
+  Using cached pip-26.1.2-py3-none-any.whl.metadata (4.6 kB)
+Using cached pip-26.1.2-py3-none-any.whl (1.8 MB)
+Installing collected packages: pip
+  Attempting uninstall: pip
+    Found existing installation: pip 24.2
+    Uninstalling pip-24.2:
+      Successfully uninstalled pip-24.2
+Successfully installed pip-26.1.2
+Requirement already satisfied: pandas<3.0,>=2.0 in .\.venv\Lib\site-packages (from -r E:\GITHUB\decision\requirements.txt (line 1)) (2.3.3)
+Requirement already satisfied: requests<3.0,>=2.31 in .\.venv\Lib\site-packages (from -r E:\GITHUB\decision\requirements.txt (line 2)) (2.34.2)
+Requirement already satisfied: numpy>=1.26.0 in .\.venv\Lib\site-packages (from pandas<3.0,>=2.0->-r E:\GITHUB\decision\requirements.txt (line 1)) (2.5.1)
+Requirement already satisfied: python-dateutil>=2.8.2 in .\.venv\Lib\site-packages (from pandas<3.0,>=2.0->-r E:\GITHUB\decision\requirements.txt (line 1)) (2.9.0.post0)
+Requirement already satisfied: pytz>=2020.1 in .\.venv\Lib\site-packages (from pandas<3.0,>=2.0->-r E:\GITHUB\decision\requirements.txt (line 1)) (2026.2)
+Requirement already satisfied: tzdata>=2022.7 in .\.venv\Lib\site-packages (from pandas<3.0,>=2.0->-r E:\GITHUB\decision\requirements.txt (line 1)) (2026.3)
+Requirement already satisfied: charset_normalizer<4,>=2 in .\.venv\Lib\site-packages (from requests<3.0,>=2.31->-r E:\GITHUB\decision\requirements.txt (line 2)) (3.4.9)
+Requirement already satisfied: idna<4,>=2.5 in .\.venv\Lib\site-packages (from requests<3.0,>=2.31->-r E:\GITHUB\decision\requirements.txt (line 2)) (3.18)
+Requirement already satisfied: urllib3<3,>=1.26 in .\.venv\Lib\site-packages (from requests<3.0,>=2.31->-r E:\GITHUB\decision\requirements.txt (line 2)) (2.7.0)
+Requirement already satisfied: certifi>=2023.5.7 in .\.venv\Lib\site-packages (from requests<3.0,>=2.31->-r E:\GITHUB\decision\requirements.txt (line 2)) (2026.6.17)
+Requirement already satisfied: six>=1.5 in .\.venv\Lib\site-packages (from python-dateutil>=2.8.2->pandas<3.0,>=2.0->-r E:\GITHUB\decision\requirements.txt (line 1)) (1.17.0)
+Dependency check OK
