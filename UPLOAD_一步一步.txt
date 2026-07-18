@@ -1,9 +1,1 @@
-1. 先解压本 ZIP。
-2. 打开你的空 GitHub 仓库。
-3. 点击蓝色 Quick setup 框中的 “uploading an existing file”。
-4. 在资源管理器中进入解压后的 StockDecisionSystem_V6_GitHubCloud 文件夹。
-5. Ctrl+A 全选里面的内容并拖到 GitHub 页面。注意必须看到 .github 文件夹；Windows 看不到时开启“显示隐藏的项目”。
-6. 页面底部点击 Commit changes。
-7. Settings → Actions → General → Read and write permissions → Save。
-8. Settings → Pages → Source 选择 GitHub Actions。
-9. Actions → Stock Decision V6 Cloud → Run workflow。
+
