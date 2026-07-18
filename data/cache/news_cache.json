@@ -1,0 +1,45 @@
+{
+  "updated_at": "2026-07-18T20:06:18",
+  "rows": [
+    {
+      "date": "2026-07-18",
+      "item": "AI资本开支变化",
+      "direction": "risk",
+      "impact": 12,
+      "sector": "CPO/PCB/AI服务器",
+      "note": "1条新闻/1个来源：Chipmaker stocks hit by AI spending worries after rally",
+      "source": "GDELT",
+      "url": "https://www.moneycontrol.com/news/business/markets/chipmaker-stocks-hit-by-ai-spending-worries-after-rally-13976016.html"
+    },
+    {
+      "date": "2026-07-18",
+      "item": "存储价格与供需",
+      "direction": "risk",
+      "impact": 16,
+      "sector": "存储芯片/封测",
+      "note": "6条新闻/5个来源：Lawmakers want US government to ban memory chips from China , even in allied supply chains citing unacceptable risk to national , economic , and supply chain security；Explainer - What is CXMT and how did it become China DRAM champion ?；Memory Chip Competition in Automotive Industry : A Race for Market Share , ETTelecom",
+      "source": "GDELT",
+      "url": "https://www.tomshardware.com/pc-components/dram/lawmakers-want-us-government-to-ban-memory-chips-from-china-even-in-allied-supply-chains-citing-unacceptable-risk-to-national-economic-and-supply-chain-security"
+    },
+    {
+      "date": "2026-07-18",
+      "item": "中东冲突与能源运输",
+      "direction": "risk",
+      "impact": 14,
+      "sector": "全市场/原油/军工/黄金",
+      "note": "1条新闻/1个来源：Japan Nikkei slides into correction zone on tech selloff , Middle East conflict",
+      "source": "GDELT",
+      "url": "https://www.businesstimes.com.sg/companies-markets/japans-nikkei-slides-correction-zone-tech-selloff-middle-east-conflict"
+    },
+    {
+      "date": "2026-07-18",
+      "item": "美联储与利率风险",
+      "direction": "risk",
+      "impact": 12,
+      "sector": "高估值成长",
+      "note": "3条新闻/3个来源：Could the Fed and Cooling Inflation Kickstart a Bigger Bitcoin Rally in July ?；Gold Heads for Biggest Weekly Loss in Six as Middle East War Fans Inflation Worries；Gold , silver rate today live updates : Where are gold and silver prices heading ? Inflation , oil and Fed bets hold the key",
+      "source": "GDELT",
+      "url": "https://www.benzinga.com/crypto/cryptocurrency/26/07/60492720/could-the-fed-and-cooling-inflation-kickstart-a-bigger-bitcoin-rally-in-july"
+    }
+  ]
+}
