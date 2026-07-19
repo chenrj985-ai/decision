@@ -677,29 +677,164 @@ def render_html(now, mode, risk, allowed, reasons, global_notes, index_df, etfs,
     held = scored[scored["held"]]
     alerts = etfs[etfs["alert"] != "正常"] if not etfs.empty else pd.DataFrame()
     mode_class = "danger" if risk >= cfg["market_risk_block"] else "warn" if risk >= 50 else "ok"
-    css = """
-    <style>
-    body{font-family:-apple-system,BlinkMacSystemFont,'Microsoft YaHei',Arial;margin:0;background:#f3f6fa;color:#1f2328}
-    .wrap{max-width:1500px;margin:auto;padding:16px}.hero{padding:18px;border-radius:14px;background:white;box-shadow:0 2px 10px #00000012}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:14px 0}.card{background:#fff;border-radius:12px;padding:14px;box-shadow:0 2px 10px #0000000d}
-    .big{font-size:28px;font-weight:700}.ok{color:#16794b}.warn{color:#a15c00}.danger{color:#c62828}
-    h1{margin:0 0 8px}h2{margin-top:24px}.data{border-collapse:collapse;width:100%;background:#fff;font-size:13px}.data th{position:sticky;top:0;background:#1769aa;color:#fff;padding:8px}.data td{padding:7px;border-bottom:1px solid #e6e8eb;text-align:center}.data tr:hover{background:#f4f8ff}.empty{background:#fff;padding:18px;border-radius:10px}.note{font-size:13px;color:#57606a}.scroll{overflow-x:auto}.pill{display:inline-block;padding:3px 9px;border-radius:12px;background:#eaf2ff;margin:2px}.alert{border-left:5px solid #d97706}
-    </style>
-    """
     summary = "；".join(reasons)
     notes = "；".join(global_notes) if global_notes else "未录入新的国际事件；当前以市场价格行为为主"
-    return f"""<!DOCTYPE html><html lang='zh-CN'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>V5智能决策</title>{css}</head><body><div class='wrap'>
-    <div class='hero'><h1>V5 市场状态 + ETF轮动 + 动态股票池</h1><div class='note'>生成时间：{now:%Y-%m-%d %H:%M:%S}</div>
-    <div class='grid'><div class='card'><div>市场模式</div><div class='big {mode_class}'>{mode}</div></div><div class='card'><div>综合风险</div><div class='big {mode_class}'>{risk}/100</div></div><div class='card'><div>建议最高仓位</div><div class='big'>{allowed}%</div></div><div class='card'><div>今日新开仓</div><div class='big'>{len(buys)}只</div></div></div>
-    <div class='note'>{summary}</div><div class='note'>国际事件：{notes}</div></div>
-    <h2>今日允许关注</h2><div class='scroll'>{html_table(buys,['signal','code','name','sector','price','pct','etf_name','etf_grade','etf_score','relative_strength','quick_profit_score','oversold_score','action'],10)}</div>
-    <h2>持仓决策</h2><div class='scroll'>{html_table(held,['signal','code','name','sector','price','cost','position_pnl','pct','etf_name','etf_grade','relative_strength','final_score','action'],30)}</div>
-    <h2>行业ETF强弱与回撤提醒</h2><div class='scroll'>{html_table(etfs,['name','price','pct','etf_score','grade','breadth','relative_strength','drawdown_from_recent_peak','alert'],30)}</div>
-    <h2>行业风险提醒</h2><div class='scroll'>{html_table(alerts,['name','pct','grade','drawdown_from_recent_peak','alert'],30)}</div>
-    <h2>指数</h2><div class='scroll'>{html_table(index_df,['name','price','pct','amount','quote_time'],20)}</div>
-    <h2>推荐跟踪</h2><div class='scroll'>{html_table(tracking,['recommend_time','code','name','signal','market_mode','etf_grade','score','price','last_price','max_return','min_return','days','status'],30)}</div>
-    <h2>全部评分前50</h2><div class='scroll'>{html_table(scored,['signal','code','name','sector','price','pct','etf_grade','etf_score','relative_strength','quality_score','quick_profit_score','oversold_score','final_score','action'],50)}</div>
-    </div></body></html>"""
+
+    css = """
+    <style>
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Microsoft YaHei',Arial,sans-serif;margin:0;background:#f3f6fa;color:#1f2328}
+    .wrap{max-width:1500px;margin:auto;padding:14px 14px 90px}
+    .hero{padding:18px;border-radius:16px;background:#fff;box-shadow:0 4px 18px #00000012}
+    .topline{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
+    .title{font-size:23px;font-weight:800;line-height:1.25;margin:0}
+    .fresh{padding:7px 11px;border-radius:999px;background:#eaf7ef;color:#16794b;font-weight:700;font-size:13px}
+    .fresh.stale{background:#fff1e6;color:#a15c00}
+    .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}
+    .card{background:#fff;border:1px solid #edf0f3;border-radius:13px;padding:13px;box-shadow:0 2px 9px #00000009}
+    .label{font-size:13px;color:#667085;margin-bottom:5px}
+    .big{font-size:27px;font-weight:800;line-height:1.15}
+    .ok{color:#16794b}.warn{color:#a15c00}.danger{color:#c62828}
+    .note{font-size:13px;color:#57606a;line-height:1.7}
+    .quick{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+    .quick a,.refresh{display:block;text-align:center;text-decoration:none;border:0;border-radius:11px;padding:11px;font-weight:700;font-size:14px;cursor:pointer}
+    .quick a{background:#1769aa;color:#fff}.refresh{background:#eef2f6;color:#25364a;width:100%}
+    .section{margin-top:18px;background:#fff;border-radius:14px;box-shadow:0 2px 10px #0000000b;overflow:hidden}
+    details>summary{list-style:none;cursor:pointer;font-size:18px;font-weight:800;padding:16px;display:flex;justify-content:space-between;align-items:center}
+    details>summary::-webkit-details-marker{display:none}
+    details>summary:after{content:'展开';font-size:12px;color:#1769aa;background:#eaf2ff;padding:5px 9px;border-radius:999px}
+    details[open]>summary:after{content:'收起'}
+    .scroll{overflow-x:auto;padding:0 10px 12px;-webkit-overflow-scrolling:touch}
+    .data{border-collapse:collapse;width:100%;min-width:760px;background:#fff;font-size:13px}
+    .data th{position:sticky;top:0;background:#1769aa;color:#fff;padding:9px 7px;white-space:nowrap}
+    .data td{padding:8px 7px;border-bottom:1px solid #e6e8eb;text-align:center;white-space:nowrap}
+    .data tr:nth-child(even){background:#f8fafc}
+    .empty{padding:18px;color:#667085}
+    .nav{position:fixed;z-index:50;left:50%;bottom:10px;transform:translateX(-50%);width:min(94%,720px);display:grid;grid-template-columns:repeat(4,1fr);background:#17283b;border-radius:16px;padding:7px;box-shadow:0 8px 28px #0005}
+    .nav a{color:#fff;text-decoration:none;text-align:center;font-size:12px;padding:8px 2px;border-radius:10px}
+    .nav a:active{background:#ffffff22}
+    .stamp{font-variant-numeric:tabular-nums}
+    @media(max-width:760px){
+      .wrap{padding:10px 10px 88px}
+      .hero{padding:14px}
+      .title{font-size:20px}
+      .grid{grid-template-columns:1fr 1fr;gap:8px}
+      .card{padding:11px}
+      .big{font-size:23px}
+      .quick{grid-template-columns:1fr 1fr}
+      details>summary{font-size:16px;padding:14px}
+      .data{font-size:12px;min-width:690px}
+      .data th,.data td{padding:8px 6px}
+    }
+    </style>
+    """
+
+    script = """
+    <script>
+    function refreshPage(){location.reload(true)}
+    function updateFreshness(){
+      const el=document.getElementById('fresh');
+      const generated=new Date(el.dataset.time.replace(' ','T')+'+08:00');
+      const minutes=(Date.now()-generated.getTime())/60000;
+      if(minutes>90){
+        el.classList.add('stale');
+        el.textContent='⚠ 数据可能已过期';
+      }else{
+        el.textContent='✓ 最新结果';
+      }
+    }
+    window.addEventListener('load',updateFreshness);
+    </script>
+    """
+
+    return f"""<!DOCTYPE html>
+<html lang='zh-CN'>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'>
+<meta name='theme-color' content='#17283b'>
+<title>股票决策·手机端</title>
+{css}
+</head>
+<body>
+<div class='wrap'>
+  <div class='hero' id='top'>
+    <div class='topline'>
+      <div>
+        <div class='title'>股票决策·手机端</div>
+        <div class='note stamp'>北京时间：{now:%Y-%m-%d %H:%M:%S}</div>
+      </div>
+      <div id='fresh' class='fresh' data-time='{now:%Y-%m-%d %H:%M:%S}'>✓ 最新结果</div>
+    </div>
+    <div class='grid'>
+      <div class='card'><div class='label'>市场模式</div><div class='big {mode_class}'>{mode}</div></div>
+      <div class='card'><div class='label'>综合风险</div><div class='big {mode_class}'>{risk}/100</div></div>
+      <div class='card'><div class='label'>最高仓位</div><div class='big'>{allowed}%</div></div>
+      <div class='card'><div class='label'>今日候选</div><div class='big'>{len(buys)}只</div></div>
+    </div>
+    <div class='note'><b>市场判断：</b>{summary}</div>
+    <div class='note'><b>国际事件：</b>{notes}</div>
+    <div class='quick'>
+      <a href='#buy'>查看今日候选</a>
+      <a href='#hold'>查看我的持仓</a>
+      <button class='refresh' onclick='refreshPage()'>刷新页面</button>
+      <a href='latest_decision.txt' target='_blank'>极简文字版</a>
+    </div>
+  </div>
+
+  <div class='section' id='buy'>
+    <details open><summary>今日允许关注（{len(buys)}只）</summary>
+      <div class='scroll'>{html_table(buys,['signal','code','name','sector','price','pct','etf_name','etf_grade','etf_score','relative_strength','quick_profit_score','oversold_score','action'],10)}</div>
+    </details>
+  </div>
+
+  <div class='section' id='hold'>
+    <details open><summary>持仓决策（{len(held)}只）</summary>
+      <div class='scroll'>{html_table(held,['signal','code','name','sector','price','cost','position_pnl','pct','etf_name','etf_grade','relative_strength','final_score','action'],30)}</div>
+    </details>
+  </div>
+
+  <div class='section' id='etf'>
+    <details><summary>行业ETF强弱</summary>
+      <div class='scroll'>{html_table(etfs,['name','price','pct','etf_score','grade','breadth','relative_strength','drawdown_from_recent_peak','alert'],30)}</div>
+    </details>
+  </div>
+
+  <div class='section'>
+    <details><summary>行业风险提醒</summary>
+      <div class='scroll'>{html_table(alerts,['name','pct','grade','drawdown_from_recent_peak','alert'],30)}</div>
+    </details>
+  </div>
+
+  <div class='section'>
+    <details><summary>指数状态</summary>
+      <div class='scroll'>{html_table(index_df,['name','price','pct','amount','quote_time'],20)}</div>
+    </details>
+  </div>
+
+  <div class='section'>
+    <details><summary>推荐跟踪</summary>
+      <div class='scroll'>{html_table(tracking,['recommend_time','code','name','signal','market_mode','etf_grade','score','price','last_price','max_return','min_return','days','status'],30)}</div>
+    </details>
+  </div>
+
+  <div class='section' id='all'>
+    <details><summary>全部评分前50</summary>
+      <div class='scroll'>{html_table(scored,['signal','code','name','sector','price','pct','etf_grade','etf_score','relative_strength','quality_score','quick_profit_score','oversold_score','final_score','action'],50)}</div>
+    </details>
+  </div>
+</div>
+
+<div class='nav'>
+  <a href='#top'>首页</a>
+  <a href='#buy'>候选</a>
+  <a href='#hold'>持仓</a>
+  <a href='#etf'>ETF</a>
+</div>
+{script}
+</body>
+</html>"""
 
 
 def cleanup(cfg: dict) -> None:

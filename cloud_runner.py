@@ -52,11 +52,11 @@ def publish_site():
             copied.append(dst_name)
 
     manifest = {
-        "version": "V5.1.1 GitHub core migration",
+        "version": "V5.1.2 Mobile Final",
         "beijing_time": bj_now().strftime("%Y-%m-%d %H:%M:%S"),
         "index": "index.html",
         "files": copied,
-        "note": "Original V5.1.1 market/scoring logic preserved; only GitHub orchestration added."
+        "note": "Original V5.1.1 market/scoring logic preserved; mobile UI and requested schedule added."
     }
     (SITE / "latest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2),
