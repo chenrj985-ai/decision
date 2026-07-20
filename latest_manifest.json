@@ -1,0 +1,8 @@
+{
+  "latest_url": "https://chenrj985-ai.github.io/decision/history/20260720_1921_36.html",
+  "relative_url": "history/20260720_1921_36.html",
+  "version": "20260720_1921_36",
+  "beijing_time": "2026-07-20 19:21:36",
+  "source": "GitHub Actions + Tencent Finance",
+  "note": "Use cache-busting query parameter when needed, for example latest_manifest.json?t=timestamp"
+}
