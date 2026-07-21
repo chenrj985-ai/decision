@@ -1,0 +1,77 @@
+name: V7 Pro Stock Auto Run
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0,20,40,45,50,55 6 * * 1-5"
+    - cron: "0 7 * * 1-5"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: stock-v7-pro
+  cancel-in-progress: false
+
+jobs:
+  run-and-publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run stock system
+        id: stock_run
+        continue-on-error: true
+        env:
+          TZ: Asia/Shanghai
+          PYTHONUTF8: "1"
+        run: python github_publish.py
+
+      - name: Commit generated files
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile_latest.html index.html history latest_url.txt latest_manifest.json status.json                   latest_decision.txt buy_candidates.csv position_decisions.csv all_scores.csv                   etf_rotation.csv index_snapshot.csv market_snapshot.csv source_health.json                   github_last_error.txt data/recommendation_history.csv data/dynamic_pool.csv                   data/risk_pool.csv output logs || true
+          if ! git diff --cached --quiet; then
+            git commit -m "Auto update stock report $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
+
+      - name: Configure Pages
+        if: always()
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy Pages
+        if: always()
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Mark workflow failed when engine failed
+        if: steps.stock_run.outcome == 'failure'
+        run: exit 1
