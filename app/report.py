@@ -39,6 +39,33 @@ def render_html(
 ) -> str:
     human_view = human_view or {}
     dimensions = dimensions or {}
+
+    # 统一网页最终结论：
+    # A/B/C/D 与底部“结论”必须来自同一套交易教练结果，
+    # 不再显示旧版原始 signal，避免“A级但写回避”的矛盾。
+    scored = scored.copy()
+    if not scored.empty and "candidate_grade" in scored.columns:
+        grade_to_decision = {
+            "A": "一级候选",
+            "B": "二级候选",
+            "C": "观察",
+            "D": "回避",
+        }
+        scored["final_decision"] = scored["candidate_grade"].map(
+            grade_to_decision
+        ).fillna("观察")
+
+        # 持仓不套用候选等级，直接显示持仓动作。
+        if "held" in scored.columns:
+            held_mask = scored["held"].fillna(False).astype(bool)
+            if "action" in scored.columns:
+                scored.loc[held_mask, "final_decision"] = (
+                    scored.loc[held_mask, "action"]
+                    .fillna("持仓观察")
+                    .astype(str)
+                )
+            else:
+                scored.loc[held_mask, "final_decision"] = "持仓观察"
     a_list = scored[(~scored["held"]) & (scored["candidate_grade"] == "A")].head(
         int(human_view.get("max_a_candidates", 6))
     ) if not scored.empty else pd.DataFrame()
@@ -185,9 +212,9 @@ def render_html(
     'deduct_reasons','coach_action'
 ], 30)}</div>
 
-<h2>原始模型正式候选（用于对照）</h2>
+<h2>A级正式候选（统一最终结论）</h2>
 <div class="scroll">{html_table(buys, [
-    'signal','code','name','sector','price','pct',
+    'final_decision','code','name','sector','price','pct',
     'etf_name','etf_grade','etf_score',
     'relative_strength','quick_profit_score',
     'oversold_score','explosion_index','action'
@@ -195,7 +222,7 @@ def render_html(
 
 <h2>持仓决策</h2>
 <div class="scroll">{html_table(held, [
-    'signal','code','name','sector','price','cost',
+    'final_decision','code','name','sector','price','cost',
     'position_pnl','pct','etf_name','etf_grade',
     'relative_strength','explosion_index','candidate_grade','coach_score',
     'recommend_reasons','deduct_reasons','explosion_reason','final_score','action'
@@ -203,7 +230,7 @@ def render_html(
 
 <h2>爆雷与行业禁买</h2>
 <div class="scroll">{html_table(blocked, [
-    'signal','code','name','sector','price','pct',
+    'final_decision','code','name','sector','price','pct',
     'etf_grade','explosion_index',
     'explosion_reason','event_note','action'
 ], 50)}</div>
@@ -227,8 +254,9 @@ def render_html(
 ], 40)}</div>
 
 <h2>全部评分前80</h2>
+<div class="note">最终结论唯一对应候选等级：A=一级候选，B=二级候选，C=观察，D=回避。综合得分仅用于同等级内排序。</div>
 <div class="scroll">{html_table(scored, [
-    'signal','code','name','sector','source','price','pct',
+    'final_decision','code','name','sector','source','price','pct',
     'etf_grade','etf_score','relative_strength','quality_score',
     'quick_profit_score','oversold_score','explosion_index','candidate_grade',
     'coach_score','human_adjust','recommend_reasons','deduct_reasons','final_score','coach_action'
