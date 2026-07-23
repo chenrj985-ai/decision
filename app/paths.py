@@ -19,6 +19,8 @@ GLOBAL_AUTO = DATA / "global_risk_auto.csv"
 TRACK = DATA / "recommendation_history.csv"
 QUOTE_CACHE = DATA / "quote_cache.csv"
 SOURCE_HEALTH = OUTPUT / "source_health.json"
+DISCOVERY_CACHE = DATA / "auto_discovery_cache.csv"
+DISCOVERY_HEALTH = OUTPUT / "discovery_health.json"
 
 for folder in (BASE, DATA, OUTPUT, HISTORY, LOGS):
     folder.mkdir(parents=True, exist_ok=True)

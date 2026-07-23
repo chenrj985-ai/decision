@@ -1,0 +1,9 @@
+{
+  "time": "2026-07-23 15:13:03",
+  "source": "新浪财经",
+  "rows": 120,
+  "cache_used": false,
+  "attempts": [
+    "东方财富:https://push2.eastmoney.com/api/qt/clist/get proxy=False: ConnectionError；https://push2.eastmoney.com/api/qt/clist/get proxy=True: ProxyError；https://82.push2.eastmoney.com/api/qt/"
+  ]
+}

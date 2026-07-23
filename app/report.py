@@ -146,13 +146,13 @@ def render_html(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>V7 Pro 人工盘面增强决策系统</title>
+<title>V7.7 多源自动发现防雷决策系统</title>
 {css}
 </head>
 <body>
 <div class="wrap">
 <div class="hero">
-  <h1>V7 Pro Windows · 市场画像 + 四级候选 + 人工盘面 + 交易教练</h1>
+  <h1>V7.7 GitHub · 东方财富/新浪/腾讯多源发现 + 重大消息硬否决</h1>
   <div class="note">生成时间：{now:%Y-%m-%d %H:%M:%S}</div>
   <div class="grid">
     <div class="card"><div>市场模式</div><div class="big {mode_class}">{mode}</div></div>

@@ -204,7 +204,7 @@ def apply_trading_coach(scored: pd.DataFrame, etfs: pd.DataFrame,
             penalties.append("人工设置禁止抄底")
         if explosion >= float(config.get("explosion_block", 60)):
             score = min(score, 39)
-        if str(r.get("signal", "")) in {"禁止买入", "爆雷禁买", "行业禁买"}:
+        if str(r.get("signal", "")) in {"禁止买入", "消息面禁买", "消息面回避", "爆雷禁买", "行业禁买"}:
             score = min(score, 35)
 
         score = round(clamp(score), 2)
@@ -212,7 +212,8 @@ def apply_trading_coach(scored: pd.DataFrame, etfs: pd.DataFrame,
         # 四层候选树：不是只显示三只。
         held = bool(r.get("held", False))
         hard_block = str(r.get("signal", "")) in {
-            "禁止买入", "爆雷禁买", "行业禁买", "数据不足观察"
+            "禁止买入", "消息面禁买", "消息面回避",
+            "爆雷禁买", "行业禁买", "数据不足观察"
         }
         if held:
             grade = "持仓"
@@ -220,15 +221,22 @@ def apply_trading_coach(scored: pd.DataFrame, etfs: pd.DataFrame,
         elif hard_block or score < 48:
             grade = "D"
             action = "禁止追入/暂时回避"
-        elif score >= 78 and risk < 60 and explosion < 45 and pct < 6:
+        elif (
+            score >= float(config.get("grade_a_min", 74))
+            and risk < 64 and explosion < 45 and pct < 6
+            and not bool(r.get("event_unknown", False))
+        ):
             grade = "A"
-            action = "一级候选：尾盘确认后小仓，禁止急拉追买"
-        elif score >= 66 and explosion < 55:
+            action = "一级候选：消息面已确认无硬雷；尾盘不急拉时仅1手"
+        elif score >= float(config.get("grade_b_min", 61)) and explosion < 55:
             grade = "B"
-            action = "二级观察：等待回踩或次日确认"
+            if bool(r.get("event_unknown", False)):
+                action = "二级观察：消息面暂未知，只观察不直接买"
+            else:
+                action = "二级候选：等待回踩或尾盘确认"
         else:
             grade = "C"
-            action = "回踩候选：当前不买，进入观察池"
+            action = "普通观察：当前不买，保留跟踪"
 
         coach_scores.append(score)
         grades.append(grade)
@@ -244,6 +252,37 @@ def apply_trading_coach(scored: pd.DataFrame, etfs: pd.DataFrame,
     out["deduct_reasons"] = penalties_text
     out["human_adjust"] = human_adjusts
     out["coach_action"] = coach_actions
+
+    # 可用性补位：若严格评分后完全没有A/B，不把页面做成“永远无候选”。
+    # 仅从无硬雷、无确认重大事件、ETF非D/E、爆雷指数较低的C级中，
+    # 择优提升最多3只为B级“安全观察候选”。未知消息股票不参与补位。
+    nonheld = ~out["held"].fillna(False).astype(bool)
+    current_ab = out[nonheld & out["candidate_grade"].isin(["A", "B"])]
+    if current_ab.empty and bool(config.get("enable_safe_fallback", True)):
+        safe_mask = (
+            nonheld
+            & (out["candidate_grade"] == "C")
+            & (~out.get("event_hard_veto", False).fillna(False).astype(bool))
+            & (~out.get("event_unknown", False).fillna(False).astype(bool))
+            & (pd.to_numeric(out.get("event_risk_value", 100), errors="coerce").fillna(100) < 30)
+            & (pd.to_numeric(out["explosion_index"], errors="coerce").fillna(100) < 48)
+            & (~out["etf_grade"].isin(["D", "E"]))
+            & (pd.to_numeric(out["pct"], errors="coerce").fillna(99).between(-2.5, 5.8))
+            & (pd.to_numeric(out["coach_score"], errors="coerce").fillna(0)
+               >= float(config.get("fallback_min_score", 55)))
+        )
+        fallback = out[safe_mask].sort_values(
+            ["coach_score", "quick_profit_score", "etf_score"],
+            ascending=False
+        ).head(int(config.get("fallback_max", 3)))
+        for idx in fallback.index:
+            out.loc[idx, "candidate_grade"] = "B"
+            out.loc[idx, "coach_action"] = (
+                "安全补位候选：无确认消息雷、爆雷指数较低；"
+                "仅尾盘走势稳定时考虑1手"
+            )
+            old = str(out.loc[idx, "recommend_reasons"])
+            out.loc[idx, "recommend_reasons"] = "安全补位机制；" + old
 
     order = {"A": 5, "B": 4, "C": 3, "持仓": 2, "D": 1}
     out["coach_priority"] = out["candidate_grade"].map(order).fillna(0)

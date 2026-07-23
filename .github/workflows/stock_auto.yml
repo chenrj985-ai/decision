@@ -1,4 +1,4 @@
-name: V7 News-Safe Stock Auto Run
+name: V7.7 Multi-Source Discovery Auto Run
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: v7-news-safe-stock-report
+  group: v7-7-multisource-stock-report
   cancel-in-progress: false
 
 jobs:
@@ -48,7 +48,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      - name: Run V7 news-safe engine
+      - name: Run V7.7 multi-source engine
         id: engine
         continue-on-error: true
         env:

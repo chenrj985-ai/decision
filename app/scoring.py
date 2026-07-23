@@ -108,7 +108,7 @@ def score_stocks(
     for _, row in stock_df.iterrows():
         event = events.get(
             row["code"],
-            {"bad": False, "risk": 0, "boost": 0, "note": ""}
+            {"bad": False, "risk": 0, "boost": 0, "unknown": False, "note": ""}
         )
         etf_name = etf_map.get(row["sector"], "")
         etf = etf_lookup.get(etf_name, {})
@@ -123,7 +123,7 @@ def score_stocks(
             10,
             math.log10(max(safe_float(row["amount"]), 1)) * 2 - 8
         )
-        quality += event["boost"] - event["risk"]
+        quality += event["boost"] - (event["risk"] if not event.get("unknown") else 8)
 
         trend = (
             48
@@ -176,8 +176,14 @@ def score_stocks(
         )
 
         # 消息面风险独立否决，不允许技术高分、ETF强势或量比漂亮将其抵消。
-        event_veto = event["bad"] or safe_float(event.get("risk")) >= float(
-            config.get("event_risk_block", 45)
+        event_veto = (
+            event["bad"]
+            or (
+                not event.get("unknown", False)
+                and safe_float(event.get("risk")) >= float(
+                    config.get("event_risk_block", 50)
+                )
+            )
         )
         blocked = (
             event_veto
@@ -193,9 +199,15 @@ def score_stocks(
         if event["bad"]:
             signal = "消息面禁买"
             action = "重大事件或消息面无法确认；禁止新增，若持有则优先控制风险"
-        elif safe_float(event.get("risk")) >= float(config.get("event_risk_block", 45)):
+        elif (
+            not event.get("unknown", False)
+            and safe_float(event.get("risk")) >= float(config.get("event_risk_block", 50))
+        ):
             signal = "消息面回避"
-            action = "解禁、减持、业绩预期差或其他事件风险较高；不得进入买入候选"
+            action = "已确认解禁、减持、业绩预期差或其他重大事件；不得进入买入候选"
+        elif event.get("unknown", False):
+            signal = "消息待确认"
+            action = "公告接口暂不可用且无新缓存；允许进入观察候选，但不能评为A级"
         elif held:
             if etf_grade in {"D", "E"} and relative < 0:
                 signal = "持仓减法"
@@ -261,6 +273,7 @@ def score_stocks(
             "event_note": event["note"],
             "event_risk_value": round(safe_float(event.get("risk")), 1),
             "event_hard_veto": bool(event.get("bad")),
+            "event_unknown": bool(event.get("unknown", False)),
             "signal": signal,
             "action": action,
             "final_score": round(final_score, 2)
@@ -283,6 +296,9 @@ def score_stocks(
         "行业禁买": 1,
         "爆雷禁买": 0,
         "回避": 0,
+        "消息面禁买": -1,
+        "消息面回避": -1,
+        "消息待确认": 4,
         "禁止买入": -1
     }
     output["priority"] = output["signal"].map(priority).fillna(0)

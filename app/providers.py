@@ -10,7 +10,7 @@ import pandas as pd
 import requests
 
 from .models import Quote
-from .paths import QUOTE_CACHE, SOURCE_HEALTH
+from .paths import QUOTE_CACHE, SOURCE_HEALTH, DISCOVERY_CACHE, DISCOVERY_HEALTH
 from .utils import log, read_csv_any, safe_float, symbol
 
 
@@ -167,78 +167,366 @@ def fetch_tencent(
     return result
 
 
+def _normalize_discovery_rows(rows, config: dict, source: str) -> pd.DataFrame:
+    if not rows:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(rows)
+    required = ["code", "name", "amount", "pct", "turnover"]
+    for col in required:
+        if col not in df.columns:
+            df[col] = 0.0 if col not in {"code", "name"} else ""
+
+    df["code"] = (
+        df["code"].astype(str)
+        .str.replace(r"^(sh|sz|bj)", "", regex=True, case=False)
+        .str.replace(r"\.0$", "", regex=True)
+        .str.zfill(6)
+    )
+    df["name"] = df["name"].astype(str).str.strip()
+    for col in ("amount", "pct", "turnover", "price"):
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+
+    # 过滤ST、退市、北交所、新股和极端日内波动。
+    bad_name = df["name"].str.contains(r"\*?ST|退", case=False, regex=True, na=False)
+    new_name = df["name"].str.startswith(("N", "C"))
+    bj = df["code"].str.startswith(("4", "8", "92"))
+    df = df[~bad_name & ~new_name & ~bj].copy()
+
+    min_amount = float(config.get("auto_discovery_min_amount", 1.5e8))
+    max_chase = float(config.get("max_chase_pct", 6.0))
+    df = df[
+        (df["amount"] >= min_amount)
+        & (df["pct"] <= max_chase)
+        & (df["pct"] >= float(config.get("auto_discovery_min_pct", -5.5)))
+        & (df["price"] >= float(config.get("auto_discovery_min_price", 3.0)))
+        & (df["price"] <= float(config.get("auto_discovery_max_price", 1500.0)))
+    ].copy()
+
+    if df.empty:
+        return df
+
+    # 排名不只看涨幅，优先流动性、温和上涨和合理换手，避免追涨。
+    amount_rank = df["amount"].rank(pct=True)
+    pct_pref = 1 - (df["pct"] - 1.5).abs().clip(upper=8) / 8
+    turn_pref = 1 - (df["turnover"] - 4.0).abs().clip(upper=20) / 20
+    df["score"] = (
+        45
+        + amount_rank * 30
+        + pct_pref * 15
+        + turn_pref * 10
+    ).clip(0, 100)
+    df["sector"] = "自动发现"
+    df["source"] = source
+
+    return (
+        df[["code", "name", "sector", "source", "score"]]
+        .drop_duplicates("code")
+        .sort_values("score", ascending=False)
+    )
+
+
+def _discover_eastmoney(config: dict) -> pd.DataFrame:
+    """
+    东方财富多入口重试：
+    - 主域名与数字子域名；
+    - HTTPS与HTTP；
+    - 同时尝试忽略系统代理、使用系统代理两种连接模式。
+    """
+    hosts = [
+        "https://push2.eastmoney.com/api/qt/clist/get",
+        "https://82.push2.eastmoney.com/api/qt/clist/get",
+        "https://20.push2.eastmoney.com/api/qt/clist/get",
+        "http://push2.eastmoney.com/api/qt/clist/get",
+    ]
+    errors = []
+
+    for url in hosts:
+        for trust_env in (False, True):
+            rows = []
+            session = requests.Session()
+            session.trust_env = trust_env
+            try:
+                for page in range(1, int(config.get("auto_discovery_pages", 3)) + 1):
+                    params = {
+                        "pn": page,
+                        "pz": int(config.get("auto_discovery_page_size", 200)),
+                        "po": 1,
+                        "np": 1,
+                        "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+                        "fltt": 2,
+                        "invt": 2,
+                        "fid": "f6",
+                        "fs": "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23",
+                        "fields": "f12,f14,f2,f3,f6,f8,f15,f16,f17,f18",
+                        "_": int(time.time() * 1000),
+                    }
+                    response = session.get(
+                        url,
+                        params=params,
+                        timeout=int(config.get("request_timeout", 12)),
+                        headers={
+                            "User-Agent": (
+                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                "AppleWebKit/537.36 Chrome/124 Safari/537.36"
+                            ),
+                            "Referer": "https://quote.eastmoney.com/",
+                            "Accept": "application/json,text/plain,*/*",
+                            "Connection": "close",
+                        }
+                    )
+                    response.raise_for_status()
+                    payload = response.json()
+                    diff = (payload.get("data") or {}).get("diff") or []
+                    if not diff:
+                        break
+                    for item in diff:
+                        rows.append({
+                            "code": item.get("f12", ""),
+                            "name": item.get("f14", ""),
+                            "price": safe_float(item.get("f2")),
+                            "pct": safe_float(item.get("f3")),
+                            "amount": safe_float(item.get("f6")),
+                            "turnover": safe_float(item.get("f8")),
+                        })
+                df = _normalize_discovery_rows(rows, config, "东方财富成交额排行")
+                if len(df) >= int(config.get("auto_discovery_min_rows", 15)):
+                    return df
+                errors.append(f"{url} rows={len(df)}")
+            except Exception as exc:
+                errors.append(f"{url} proxy={trust_env}: {type(exc).__name__}")
+                time.sleep(0.5)
+    raise RuntimeError("；".join(errors[-8:]))
+
+
+def _discover_sina(config: dict) -> pd.DataFrame:
+    url = (
+        "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/"
+        "Market_Center.getHQNodeData"
+    )
+    rows = []
+    errors = []
+
+    for trust_env in (False, True):
+        session = requests.Session()
+        session.trust_env = trust_env
+        try:
+            for page in range(1, int(config.get("auto_discovery_pages", 3)) + 1):
+                params = {
+                    "page": page,
+                    "num": int(config.get("auto_discovery_page_size", 200)),
+                    "sort": "amount",
+                    "asc": 0,
+                    "node": "hs_a",
+                    "symbol": "",
+                    "_s_r_a": "page",
+                }
+                response = session.get(
+                    url,
+                    params=params,
+                    timeout=int(config.get("request_timeout", 12)),
+                    headers={
+                        "User-Agent": "Mozilla/5.0",
+                        "Referer": "https://finance.sina.com.cn/",
+                        "Connection": "close",
+                    }
+                )
+                response.raise_for_status()
+                data = response.json()
+                if not data:
+                    break
+                for item in data:
+                    price = safe_float(item.get("trade") or item.get("price"))
+                    prev = safe_float(item.get("settlement") or item.get("prev_close"))
+                    pct = safe_float(item.get("changepercent"))
+                    if pct == 0 and price > 0 and prev > 0:
+                        pct = (price / prev - 1) * 100
+                    amount = safe_float(item.get("amount"))
+                    if amount <= 0:
+                        amount = safe_float(item.get("volume")) * price
+                    rows.append({
+                        "code": item.get("code") or item.get("symbol", ""),
+                        "name": item.get("name", ""),
+                        "price": price,
+                        "pct": pct,
+                        "amount": amount,
+                        "turnover": safe_float(item.get("turnoverratio")),
+                    })
+            df = _normalize_discovery_rows(rows, config, "新浪财经成交额排行")
+            if len(df) >= int(config.get("auto_discovery_min_rows", 15)):
+                return df
+            errors.append(f"rows={len(df)}")
+        except Exception as exc:
+            errors.append(f"proxy={trust_env}: {type(exc).__name__}")
+    raise RuntimeError("；".join(errors[-4:]))
+
+
+def _discover_tencent_rank(config: dict) -> pd.DataFrame:
+    """
+    腾讯排行接口作为第三实时源。接口字段可能精简，因此只要求代码、
+    名称、价格、涨跌幅和成交额可解析。
+    """
+    urls = [
+        "https://stock.gtimg.cn/data/index.php",
+        "http://stock.gtimg.cn/data/index.php",
+    ]
+    errors = []
+
+    for url in urls:
+        for trust_env in (False, True):
+            session = requests.Session()
+            session.trust_env = trust_env
+            try:
+                rows = []
+                for page in range(1, 5):
+                    params = {
+                        "appn": "rank",
+                        "t": "rankash/chr",
+                        "p": page,
+                        "o": 0,
+                        "l": 100,
+                        "v": "list_data",
+                    }
+                    response = session.get(
+                        url,
+                        params=params,
+                        timeout=int(config.get("request_timeout", 12)),
+                        headers={
+                            "User-Agent": "Mozilla/5.0",
+                            "Referer": "https://stockapp.finance.qq.com/",
+                            "Connection": "close",
+                        }
+                    )
+                    response.raise_for_status()
+                    response.encoding = "gbk"
+                    body = response.text
+
+                    # 常见返回中每条记录以 ~ 分隔字段，以逗号或引号分隔股票。
+                    records = re.findall(r'"([^"]*~[^"]*)"', body)
+                    if not records:
+                        records = [x for x in body.split(",") if "~" in x]
+
+                    for rec in records:
+                        parts = rec.strip().strip('"').split("~")
+                        if len(parts) < 6:
+                            continue
+                        # 尝试从字段中识别6位代码。
+                        code = next(
+                            (x for x in parts if re.fullmatch(r"\d{6}", x.strip())),
+                            ""
+                        )
+                        if not code:
+                            continue
+                        name = parts[1].strip() if len(parts) > 1 else ""
+                        nums = [safe_float(x) for x in parts]
+                        price = nums[3] if len(nums) > 3 else 0
+                        pct = nums[5] if len(nums) > 5 else 0
+                        amount = max(nums) if nums else 0
+                        rows.append({
+                            "code": code,
+                            "name": name,
+                            "price": price,
+                            "pct": pct,
+                            "amount": amount,
+                            "turnover": 0,
+                        })
+                df = _normalize_discovery_rows(rows, config, "腾讯股票排行")
+                if len(df) >= int(config.get("auto_discovery_min_rows", 10)):
+                    return df
+                errors.append(f"{url} rows={len(df)}")
+            except Exception as exc:
+                errors.append(f"{url} proxy={trust_env}: {type(exc).__name__}")
+    raise RuntimeError("；".join(errors[-6:]))
+
+
+def _save_discovery_cache(df: pd.DataFrame, source: str) -> None:
+    if df is None or df.empty:
+        return
+    cached = df.copy()
+    cached["cache_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cached["live_source"] = source
+    DISCOVERY_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    cached.to_csv(DISCOVERY_CACHE, index=False, encoding="utf-8-sig")
+
+
+def _load_discovery_cache(config: dict) -> pd.DataFrame:
+    if not DISCOVERY_CACHE.exists():
+        return pd.DataFrame()
+    try:
+        age_hours = (
+            datetime.now() - datetime.fromtimestamp(DISCOVERY_CACHE.stat().st_mtime)
+        ).total_seconds() / 3600
+        if age_hours > float(config.get("auto_discovery_cache_hours", 72)):
+            return pd.DataFrame()
+        df = read_csv_any(DISCOVERY_CACHE, dtype={"code": str})
+        if df.empty:
+            return df
+        df["code"] = df["code"].astype(str).str.replace(r"\.0$", "", regex=True).str.zfill(6)
+        df["source"] = "自动发现缓存"
+        # 缓存略微降分，但仍然属于自动池，不退回核心池。
+        df["score"] = pd.to_numeric(df.get("score"), errors="coerce").fillna(50) - 3
+        return df[["code", "name", "sector", "source", "score"]]
+    except Exception:
+        return pd.DataFrame()
+
+
 def auto_discover(config: dict) -> pd.DataFrame:
     """
-    东方财富仅用于发现高成交额股票。
-    失败时返回空表，不影响腾讯核心行情。
+    多源自动发现：
+    东方财富 → 新浪财经 → 腾讯排行 → 72小时缓存。
+
+    即使东方财富单源不可用，也不会立即退回“仅核心池”。
     """
     if not config.get("use_auto_discovery", True):
         return pd.DataFrame()
 
-    url = "https://push2.eastmoney.com/api/qt/clist/get"
-    rows = []
-    session = _session()
-    try:
-        for page in range(1, 4):
-            params = {
-                "pn": page,
-                "pz": 200,
-                "po": 1,
-                "np": 1,
-                "ut": "bd1d9ddb04089700cf9c27f6f7426281",
-                "fltt": 2,
-                "invt": 2,
-                "fid": "f6",
-                "fs": "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23",
-                "fields": "f12,f14,f2,f3,f6,f8,f15,f16,f17,f18"
-            }
-            response = session.get(
-                url,
-                params=params,
-                timeout=int(config["request_timeout"]),
-                headers={
-                    "User-Agent": "Mozilla/5.0",
-                    "Referer": "https://quote.eastmoney.com/"
-                }
-            )
-            response.raise_for_status()
-            diff = response.json().get("data", {}).get("diff", []) or []
-            if not diff:
+    attempts = []
+    source_used = ""
+    result = pd.DataFrame()
+
+    sources = [
+        ("东方财富", _discover_eastmoney),
+        ("新浪财经", _discover_sina),
+        ("腾讯排行", _discover_tencent_rank),
+    ]
+
+    for source_name, func in sources:
+        try:
+            candidate = func(config)
+            if candidate is not None and not candidate.empty:
+                result = candidate.head(int(config.get("dynamic_pool_max", 80))).copy()
+                source_used = source_name
+                _save_discovery_cache(result, source_name)
+                log(f"自动发现成功：{source_name}，发现{len(result)}只候选")
                 break
+        except Exception as exc:
+            attempts.append(f"{source_name}:{str(exc)[:180]}")
+            log(f"{source_name}自动发现失败，继续切换备用源：{type(exc).__name__}")
 
-            for item in diff:
-                code = str(item.get("f12", "")).zfill(6)
-                name = str(item.get("f14", ""))
-                amount = safe_float(item.get("f6"))
-                pct = safe_float(item.get("f3"))
-                turnover = safe_float(item.get("f8"))
+    cache_used = False
+    if result.empty:
+        result = _load_discovery_cache(config)
+        if not result.empty:
+            cache_used = True
+            source_used = "72小时自动发现缓存"
+            log(f"实时自动发现源均不可用，使用缓存候选{len(result)}只")
+        else:
+            source_used = "无可用实时源且无缓存"
+            log("自动发现所有实时源均失败，且暂无缓存；本次才退回核心池和持仓")
 
-                if not code or "ST" in name.upper() or "退" in name:
-                    continue
-                if amount < 2e8:
-                    continue
-                if pct > float(config["max_chase_pct"]) or pct < -7:
-                    continue
+    health = {
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "source": source_used,
+        "rows": int(len(result)),
+        "cache_used": cache_used,
+        "attempts": attempts[-12:],
+    }
+    DISCOVERY_HEALTH.write_text(
+        json.dumps(health, ensure_ascii=False, indent=2),
+        encoding="utf-8"
+    )
 
-                liquidity = min(28, max(0, (len(str(int(amount))) - 7) * 5))
-                score = 45 + liquidity + min(15, pct * 2) + min(12, turnover)
-                rows.append({
-                    "code": code,
-                    "name": name,
-                    "sector": "自动发现",
-                    "source": "东方财富成交额",
-                    "score": round(max(0, min(100, score)), 2)
-                })
+    return result
 
-        if not rows:
-            return pd.DataFrame()
-
-        return (
-            pd.DataFrame(rows)
-            .drop_duplicates("code")
-            .sort_values("score", ascending=False)
-            .head(int(config["dynamic_pool_max"]))
-        )
-    except Exception as exc:
-        log(f"东方财富自动发现不可用，继续使用核心池和持仓：{exc}")
-        return pd.DataFrame()

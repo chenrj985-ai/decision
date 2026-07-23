@@ -20,8 +20,8 @@
   "prefer_pullback": true,
   "market_note": "",
   "stock_adjustments": {},
-  "max_a_candidates": 6,
-  "max_b_candidates": 12,
-  "max_c_candidates": 20,
+  "max_a_candidates": 3,
+  "max_b_candidates": 5,
+  "max_c_candidates": 12,
   "updated_by": "Windows人工盘面编辑器"
 }
