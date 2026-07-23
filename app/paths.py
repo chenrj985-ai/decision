@@ -20,5 +20,5 @@ TRACK = DATA / "recommendation_history.csv"
 QUOTE_CACHE = DATA / "quote_cache.csv"
 SOURCE_HEALTH = OUTPUT / "source_health.json"
 
-for folder in (BASE, DATA, OUTPUT, HISTORY, LOGS):
+for folder in (DATA, OUTPUT, HISTORY, LOGS):
     folder.mkdir(parents=True, exist_ok=True)

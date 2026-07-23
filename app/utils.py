@@ -40,6 +40,7 @@ DEFAULT_CONFIG = {
     "industry_alert_drawdown_orange": 9.0,
     "industry_alert_drawdown_red": 14.0,
     "use_auto_discovery": True,
+    "event_lookback_days": 10,
     "auto_open_html": True,
     "international_weight": 0.15,
     "position_default_lot": 100,

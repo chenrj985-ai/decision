@@ -26,6 +26,17 @@ def explosion_index(row, etf_grade: str, event: dict, config: dict):
         score += min(35, event["risk"])
         reasons.append(f"事件风险+{event['risk']:.0f}")
 
+    # 极端下跌必须比追高风险优先处理。
+    if pct <= -9.3:
+        score += 100
+        reasons.append("跌停或接近跌停，禁止新增")
+    elif pct <= -7:
+        score += 55
+        reasons.append("当日跌幅超过7%，禁止抄底")
+    elif pct <= -5:
+        score += 30
+        reasons.append("当日大跌，进入风险观察")
+
     if pct >= 9.3:
         score += 35
         reasons.append("接近涨停，追高风险")

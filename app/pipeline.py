@@ -17,6 +17,7 @@ from .report import render_html, save_report
 from .coach import apply_trading_coach, add_sector_lifecycle, market_dimensions
 from .risk import score_etfs, global_risk_score, market_regime
 from .scoring import score_stocks
+from .event_risk_auto import refresh_auto_event_file
 from .state import update_dynamic_pool, update_risk_pool, update_tracking
 from .templates import ensure_templates
 from .utils import (
@@ -61,6 +62,14 @@ def run() -> int:
         raise RuntimeError(
             "未取得任何股票行情。请查看output\\source_health.json和logs\\last_error.txt"
         )
+
+    # 在技术评分之前先扫描公告、解禁、减持和业绩公告后的负面价格反应。
+    # 事件风险拥有一票否决权，避免跌停股仍进入A/B候选。
+    refresh_auto_event_file(
+        stock_df,
+        lookback_days=int(config.get("event_lookback_days", 10)),
+        timeout=int(config.get("request_timeout", 12)),
+    )
 
     etf_scores = score_etfs(etf_df, stock_df, config)
     etf_scores = add_sector_lifecycle(etf_scores)

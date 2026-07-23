@@ -25,5 +25,6 @@
   "use_auto_discovery": true,
   "auto_open_html": false,
   "international_weight": 0.15,
-  "position_default_lot": 100
+  "position_default_lot": 100,
+  "event_lookback_days": 10
 }
