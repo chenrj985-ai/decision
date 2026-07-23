@@ -1,0 +1,94 @@
+name: V7.7 Multi-Source Discovery Auto Run
+
+on:
+  workflow_dispatch:
+  schedule:
+    # GitHub cron使用UTC。以下对应北京时间工作日11:00。
+    - cron: "0 3 * * 1-5"
+    # 北京时间工作日14:00、14:20、14:40、14:50。
+    - cron: "0,20,40,50 6 * * 1-5"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: v7-7-multisource-stock-report
+  cancel-in-progress: false
+
+jobs:
+  run-stock-system:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Create required folders
+        run: |
+          mkdir -p output/history logs history public/history
+          touch output/.gitkeep
+          touch output/history/.gitkeep
+          touch logs/.gitkeep
+          touch history/.gitkeep
+          touch public/.gitkeep
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run V7.7 multi-source engine
+        id: engine
+        continue-on-error: true
+        env:
+          TZ: Asia/Shanghai
+          PYTHONUTF8: "1"
+          PYTHONUNBUFFERED: "1"
+        run: python github_run.py
+
+      - name: Verify outputs
+        if: always()
+        run: python verify_outputs.py
+
+      - name: Commit generated reports and risk data
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Auto update V7 stock report and event risk"
+            git pull --rebase origin "${GITHUB_REF_NAME}" || true
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+      - name: Configure GitHub Pages
+        if: always()
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy GitHub Pages
+        if: always()
+        uses: actions/deploy-pages@v4
+
+      - name: Mark workflow failed if engine failed
+        if: steps.engine.outcome == 'failure'
+        run: |
+          echo "V7核心程序运行失败，旧报告保留。请查看status.json和Actions日志。"
+          exit 1
