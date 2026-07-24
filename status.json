@@ -1,8 +1,8 @@
 {
   "status": "success",
-  "beijing_time": "2026-07-24 13:47:41",
+  "beijing_time": "2026-07-24 15:03:14",
   "output_exists": true,
-  "report_size": 82087,
-  "history_file": "history/20260724_1347_41.html",
-  "github_run_id": "30070390871"
+  "report_size": 78637,
+  "history_file": "history/20260724_1503_14.html",
+  "github_run_id": "30074151029"
 }
