@@ -2,12 +2,14 @@ name: V7.7 Multi-Source Discovery Auto Run
 
 on:
   workflow_dispatch:
-  schedule:
-    # GitHub cron使用UTC。以下对应北京时间工作日11:00。
-    - cron: "0 3 * * 1-5"
-    # 北京时间工作日14:00、14:20、14:40、14:50。
-    - cron: "0,20,40,50 6 * * 1-5"
 
+  schedule:
+    # 北京时间工作日11:00
+    - cron: "0 3 * * 1-5"
+
+    # 北京时间工作日14:00、14:10、14:20、14:30、
+    # 14:40、14:45、14:50
+    - cron: "0,10,20,30,40,45,50 6 * * 1-5"
 permissions:
   contents: write
   pages: write
