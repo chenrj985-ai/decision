@@ -1,9 +1,7 @@
 {
-  "time": "2026-11-02 22:42:04",
-  "source": "新浪财经",
+  "time": "2026-11-03 15:53:52",
+  "source": "东方财富",
   "rows": 120,
   "cache_used": false,
-  "attempts": [
-    "东方财富:https://push2.eastmoney.com/api/qt/clist/get proxy=False: HTTPError；https://push2.eastmoney.com/api/qt/clist/get proxy=True: HTTPError；https://82.push2.eastmoney.com/api/qt/clist/g"
-  ]
+  "attempts": []
 }
